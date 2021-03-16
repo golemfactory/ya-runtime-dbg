@@ -98,6 +98,15 @@ impl ExecMode {
     }
 }
 
+impl ToString for ExecMode {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Shell(sh) => sh.clone(),
+            Self::Exec => "exec".to_string(),
+        }
+    }
+}
+
 struct EventHandler<T: Terminal> {
     tx: mpsc::Sender<()>,
     arbiter: actix::Arbiter,
@@ -194,6 +203,7 @@ where
 
 async fn start<T>(
     args: Args,
+    exec_mode: ExecMode,
     mut input_rx: mpsc::Receiver<String>,
     start_tx: oneshot::Sender<()>,
     mut ui: UI<T>,
@@ -201,7 +211,6 @@ async fn start<T>(
 where
     T: Terminal + 'static,
 {
-    let exec_mode = ExecMode::new(args.exec_mode, args.exec_shell.clone());
     let mut rt_args = args.to_runtime_args();
     rt_args.push(OsString::from("start"));
 
@@ -310,10 +319,11 @@ fn is_broken_pipe(message: &str) -> bool {
 async fn main() -> Result<()> {
     let mut args = Args::from_args();
     args.runtime = args.runtime.canonicalize().context("runtime not found")?;
+    let exec_mode = ExecMode::new(args.exec_mode, args.exec_shell.clone());
 
     let proj_dir = project_dir()?;
     let history_path = proj_dir.join(".ya_dbg_history");
-    let mut ui = default_ui(history_path)?;
+    let mut ui = ui(history_path, &exec_mode.to_string())?;
 
     let rt_args = args
         .to_runtime_args()
@@ -341,7 +351,7 @@ async fn main() -> Result<()> {
         let ui = ui.clone();
         move || {
             System::new("runtime").block_on(async move {
-                if let Err(e) = start(args, input_rx, start_tx, ui.clone()).await {
+                if let Err(e) = start(args, exec_mode, input_rx, start_tx, ui.clone()).await {
                     ui_err!(ui, "Runtime error: {}", e);
                 }
             })

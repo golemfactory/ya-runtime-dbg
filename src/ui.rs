@@ -13,8 +13,8 @@ lazy_static::lazy_static! {
     pub static ref COLOR_PROMPT: ansi_term::Style = ansi_term::Color::Green.bold();
 }
 
-pub fn default_ui<P: AsRef<Path>>(history_path: P) -> Result<UI<DefaultTerminal>> {
-    UI::new(Interface::new("ui")?, history_path)
+pub fn ui<P: AsRef<Path>>(history_path: P, shell: &str) -> Result<UI<DefaultTerminal>> {
+    UI::new(Interface::new("ui")?, history_path, shell)
 }
 
 macro_rules! ui_info {
@@ -58,7 +58,11 @@ impl<T: Terminal> Clone for UI<T> {
 }
 
 impl<T: Terminal + 'static> UI<T> {
-    pub fn new<P: AsRef<Path>>(interface: Interface<T>, history_path: P) -> Result<Self> {
+    pub fn new<P: AsRef<Path>>(
+        interface: Interface<T>,
+        history_path: P,
+        shell: &str,
+    ) -> Result<Self> {
         {
             OpenOptions::new()
                 .append(true)
@@ -69,8 +73,9 @@ impl<T: Terminal + 'static> UI<T> {
 
         interface.load_history(&history_path)?;
         interface.set_prompt(&format!(
-            "\x01{prefix}\x02{text}\x01{suffix}\x02",
+            "\x01{prefix}\x02{shell} {text}\x01{suffix}\x02",
             prefix = (*COLOR_PROMPT).prefix(),
+            shell = shell,
             text = "▶ ",
             suffix = (*COLOR_PROMPT).suffix()
         ))?;
