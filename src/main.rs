@@ -8,6 +8,7 @@ use std::fs::create_dir_all;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
+use structopt::clap::arg_enum;
 use structopt::{clap, StructOpt};
 use tokio::process::Command;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -29,6 +30,17 @@ const QUALIFIER: &str = "";
 #[structopt(global_setting = clap::AppSettings::DeriveDisplayOrder)]
 #[structopt(rename_all = "kebab-case")]
 struct Args {
+    /// Mode to execute commands in
+    #[structopt(
+        long,
+        possible_values = &ExecModeArg::variants(),
+        case_insensitive = true,
+        default_value = "shell"
+    )]
+    exec_mode: ExecModeArg,
+    /// Execution shell (for "--exec-mode shell" or default mode)
+    #[structopt(long, default_value = "bash")]
+    exec_shell: String,
     /// Runtime binary
     #[structopt(short, long)]
     runtime: PathBuf,
@@ -61,6 +73,37 @@ impl Args {
         ];
         args.extend(self.varargs.iter().map(OsString::from));
         args
+    }
+}
+
+arg_enum! {
+    #[derive(Clone, Copy, Debug)]
+    enum ExecModeArg {
+        Shell,
+        Exec
+    }
+}
+
+enum ExecMode {
+    Shell(String),
+    Exec,
+}
+
+impl ExecMode {
+    fn new(mode_arg: ExecModeArg, shell: String) -> Self {
+        match mode_arg {
+            ExecModeArg::Shell => ExecMode::Shell(shell),
+            ExecModeArg::Exec => ExecMode::Exec,
+        }
+    }
+}
+
+impl ToString for ExecMode {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Shell(sh) => sh.clone(),
+            Self::Exec => "exec".to_string(),
+        }
     }
 }
 
@@ -160,6 +203,7 @@ where
 
 async fn start<T>(
     args: Args,
+    exec_mode: ExecMode,
     mut input_rx: mpsc::Receiver<String>,
     start_tx: oneshot::Sender<()>,
     mut ui: UI<T>,
@@ -187,7 +231,7 @@ where
 
     let _ = start_tx.send(());
     while let Some(input) = input_rx.next().await {
-        if let Err(e) = run(service.clone(), input).await {
+        if let Err(e) = run(service.clone(), input, &exec_mode).await {
             let message = e.root_cause().to_string();
             ui_err!(ui, "{}", message);
             // runtime apis do not allow us to recover from this error,
@@ -212,11 +256,17 @@ where
     Ok(())
 }
 
-async fn run(service: impl RuntimeService, input: String) -> Result<()> {
-    let mut args = shell_words::split(input.as_str())?;
-    if args.len() == 0 {
-        return Ok(());
-    }
+async fn run(service: impl RuntimeService, input: String, mode: &ExecMode) -> Result<()> {
+    let mut args = match mode {
+        ExecMode::Shell(sh) => vec![format!("/bin/{}", sh), "-c".to_string(), input],
+        ExecMode::Exec => {
+            let args = shell_words::split(input.as_str())?;
+            match args.len() {
+                0 => return Ok(()),
+                _ => args,
+            }
+        }
+    };
 
     let bin_path = PathBuf::from_str(args.remove(0).as_str())?;
     let bin_name = bin_path
@@ -269,10 +319,11 @@ fn is_broken_pipe(message: &str) -> bool {
 async fn main() -> Result<()> {
     let mut args = Args::from_args();
     args.runtime = args.runtime.canonicalize().context("runtime not found")?;
+    let exec_mode = ExecMode::new(args.exec_mode, args.exec_shell.clone());
 
     let proj_dir = project_dir()?;
     let history_path = proj_dir.join(".ya_dbg_history");
-    let mut ui = default_ui(history_path)?;
+    let mut ui = ui(history_path, &exec_mode.to_string())?;
 
     let rt_args = args
         .to_runtime_args()
@@ -280,12 +331,6 @@ async fn main() -> Result<()> {
         .map(|s: OsString| s.as_os_str().to_string_lossy().to_string())
         .collect::<Vec<_>>();
 
-    ui_info!(
-        ui,
-        "{} {}",
-        structopt::clap::crate_name!(),
-        env!("CARGO_PKG_VERSION")
-    );
     ui_info!(
         ui,
         "Arguments: {} {}",
@@ -306,7 +351,7 @@ async fn main() -> Result<()> {
         let ui = ui.clone();
         move || {
             System::new("runtime").block_on(async move {
-                if let Err(e) = start(args, input_rx, start_tx, ui.clone()).await {
+                if let Err(e) = start(args, exec_mode, input_rx, start_tx, ui.clone()).await {
                     ui_err!(ui, "Runtime error: {}", e);
                 }
             })

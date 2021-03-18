@@ -15,21 +15,25 @@ Check the [releases](https://github.com/golemfactory/ya-runtime-dbg/releases) pa
 
 ```bash
 USAGE:
-ya-runtime-dbg [FLAGS] [OPTIONS] --runtime <runtime> --task-package <task-package> --workdir <workdir> [varargs]...
+    ya-runtime-dbg [FLAGS] [OPTIONS] --runtime <runtime> --task-package <task-package> --workdir <workdir> [varargs]...
 
 FLAGS:
---no-deploy    Skip deployment phase
--h, --help         Prints help information
--V, --version      Prints version information
+        --no-deploy    Skip deployment phase
+    -h, --help         Prints help information
+    -V, --version      Prints version information
 
 OPTIONS:
--r, --runtime <runtime>              Runtime binary
--w, --workdir <workdir>              Working directory
--t, --task-package <task-package>    Task package to deploy (e.g. gvmi)
--p, --protocol <protocol>            Service protocol version [default: 0.1.0]
+        --exec-mode <exec-mode>          Mode to execute commands in [default: shell]  [possible values:
+                                         Shell, Exec]
+        --exec-shell <exec-shell>        Execution shell (for "--exec-mode shell" or default mode) [default:
+                                         bash]
+    -r, --runtime <runtime>              Runtime binary
+    -w, --workdir <workdir>              Working directory
+    -t, --task-package <task-package>    Task package to deploy
+    -p, --protocol <protocol>            Service protocol version [default: 0.1.0]
 
 ARGS:
-<varargs>...    Additional runtime arguments
+    <varargs>...    Additional runtime arguments
 ```
 
 ## Example invocation
@@ -43,4 +47,4 @@ ya-runtime-dbg --runtime /usr/lib/yagna/plugins/ya-runtime-vm/ya-runtime-vm \
 
 ## Available runtimes
 
-Available runtimes be discovered via [ya-runtime](https://github.com/topics/ya-runtime) topic on GH.
+Available runtimes can be discovered via [ya-runtime](https://github.com/topics/ya-runtime) topic on GH.
