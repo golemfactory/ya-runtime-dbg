@@ -64,6 +64,22 @@ struct Args {
 }
 
 impl Args {
+    fn canonicalize(&mut self) -> Result<()> {
+        self.runtime = self
+            .runtime
+            .canonicalize()
+            .context(format!("runtime not found: {:?}", self.runtime))?;
+        self.workdir = self
+            .workdir
+            .canonicalize()
+            .context(format!("workdir not found: {:?}", self.workdir))?;
+        self.task_package = self
+            .task_package
+            .canonicalize()
+            .context(format!("task package not found: {:?}", self.task_package))?;
+        Ok(())
+    }
+
     fn to_runtime_args(&self) -> Vec<OsString> {
         let mut args = vec![
             OsString::from("--workdir"),
@@ -182,7 +198,6 @@ where
 
     ui_info!(ui, "Deploying");
 
-    let _ = create_dir_all(&args.workdir);
     let mut child = runtime_command(&args)?
         .kill_on_drop(true)
         .args(rt_args)
@@ -318,13 +333,14 @@ fn is_broken_pipe(message: &str) -> bool {
 #[actix_rt::main]
 async fn main() -> Result<()> {
     let mut args = Args::from_args();
-    args.runtime = args.runtime.canonicalize().context("runtime not found")?;
-    let exec_mode = ExecMode::new(args.exec_mode, args.exec_shell.clone());
+    let _ = create_dir_all(&args.workdir);
 
     let proj_dir = project_dir()?;
     let history_path = proj_dir.join(".ya_dbg_history");
+    let exec_mode = ExecMode::new(args.exec_mode, args.exec_shell.clone());
     let mut ui = ui(history_path, &exec_mode.to_string())?;
 
+    args.canonicalize()?;
     let rt_args = args
         .to_runtime_args()
         .into_iter()
