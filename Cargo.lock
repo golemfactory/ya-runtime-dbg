@@ -1439,8 +1439,8 @@ dependencies = [
 
 [[package]]
 name = "ya-runtime-api"
-version = "0.1.2"
-source = "git+https://github.com/golemfactory/yagna.git?branch=release/v0.6#3a963f7e1b6a382f30b0db5277669abb77a48179"
+version = "0.2.0"
+source = "git+https://github.com/golemfactory/yagna.git?rev=9877a31c9c325e884c86f48d88f91d77e8cee94d#9877a31c9c325e884c86f48d88f91d77e8cee94d"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1456,7 +1456,7 @@ dependencies = [
 
 [[package]]
 name = "ya-runtime-dbg"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "actix",
  "actix-rt",

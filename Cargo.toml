@@ -1,12 +1,12 @@
 [package]
 name = "ya-runtime-dbg"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Golem Factory <contact@golem.network>"]
 edition = "2018"
 repository = "https://github.com/golemfactory/ya-runtime-dbg"
 
 [dependencies]
-ya-runtime-api = { version = "0.1", features = ["server"] }
+ya-runtime-api = { version = "0.2", features = ["server"] }
 
 actix = { version = "0.9", default-features = false }
 actix-rt = "1.0.1"
@@ -22,4 +22,4 @@ tokio = { version = "0.2", features = ["io-util", "process"], default_features =
 tokio-util = { version = "0.2", features = ["codec"] }
 
 [patch.crates-io]
-ya-runtime-api = { git = "https://github.com/golemfactory/yagna.git", branch="release/v0.6" }
+ya-runtime-api = { git = "https://github.com/golemfactory/yagna.git", rev="9877a31c9c325e884c86f48d88f91d77e8cee94d" }
