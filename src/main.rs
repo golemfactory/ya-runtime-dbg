@@ -240,13 +240,13 @@ async fn start<T>(
 where
     T: Terminal + 'static,
 {
-    let mut rt_args = args.to_runtime_args();
-    rt_args.push(OsString::from("start"));
-
     ui_info!(ui, "Starting");
 
     let mut command = runtime_command(&args)?;
-    command.args(rt_args).args(args.start_arg);
+    command
+        .args(args.to_runtime_args())
+        .arg("start")
+        .args(args.start_arg);
 
     let (tx, mut rx) = mpsc::channel(1);
     let service = spawn(command, EventHandler::new(tx, ui.clone()))
