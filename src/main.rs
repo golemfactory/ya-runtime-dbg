@@ -60,6 +60,12 @@ struct Args {
         parse(from_flag = std::ops::Not::not),
     )]
     deploy: bool,
+    /// Additional DEPLOY command arguments
+    #[structopt(long, multiple = true)]
+    deploy_arg: Vec<String>,
+    /// Additional START command arguments
+    #[structopt(long, multiple = true)]
+    start_arg: Vec<String>,
     /// Additional runtime arguments
     varargs: Vec<String>,
 }
@@ -200,14 +206,13 @@ async fn deploy<T>(args: &Args, ui: UI<T>) -> Result<()>
 where
     T: Terminal + 'static,
 {
-    let mut rt_args = args.to_runtime_args();
-    rt_args.push(OsString::from("deploy"));
-
     ui_info!(ui, "Deploying");
 
     let mut child = runtime_command(&args)?
         .kill_on_drop(true)
-        .args(rt_args)
+        .args(args.to_runtime_args())
+        .arg("deploy")
+        .args(&args.deploy_arg)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -235,13 +240,13 @@ async fn start<T>(
 where
     T: Terminal + 'static,
 {
-    let mut rt_args = args.to_runtime_args();
-    rt_args.push(OsString::from("start"));
-
     ui_info!(ui, "Starting");
 
     let mut command = runtime_command(&args)?;
-    command.args(rt_args);
+    command
+        .args(args.to_runtime_args())
+        .arg("start")
+        .args(args.start_arg);
 
     let (tx, mut rx) = mpsc::channel(1);
     let service = spawn(command, EventHandler::new(tx, ui.clone()))
