@@ -174,7 +174,7 @@ impl<T: Terminal + 'static> RuntimeEvent for EventHandler<T> {
     }
 }
 
-fn forward_output<R, T>(read: R, mut writer: UI<T>)
+fn forward_output<R, T>(read: R, writer: UI<T>)
 where
     R: tokio::io::AsyncRead + 'static,
     T: Terminal + 'static,
@@ -185,7 +185,10 @@ where
         .map(|v| v.into_iter().map(|b| b.to_vec()).flatten().collect());
     Arbiter::spawn(async move {
         stream
-            .for_each(move |v| futures::future::ready(write_output(&mut writer, v)))
+            .for_each(move |v| {
+                write_output(&writer, v);
+                futures::future::ready(())
+            })
             .await;
     });
 }
@@ -197,7 +200,7 @@ where
     let cow = String::from_utf8_lossy(out.as_slice());
     let out = cow.trim();
     if !out.is_empty() {
-        let nl = if out.ends_with("\n") { "" } else { "\n" };
+        let nl = if out.ends_with('\n') { "" } else { "\n" };
         write!(writer, "{}{}", out, nl).unwrap();
     }
 }
@@ -208,7 +211,7 @@ where
 {
     ui_info!(ui, "Deploying");
 
-    let mut child = runtime_command(&args)?
+    let mut child = runtime_command(args)?
         .kill_on_drop(true)
         .args(args.to_runtime_args())
         .arg("deploy")
@@ -226,7 +229,7 @@ where
         ));
     }
 
-    writeln!(ui, "").unwrap();
+    writeln!(ui).unwrap();
     Ok(())
 }
 
@@ -305,11 +308,13 @@ async fn run(service: impl RuntimeService, input: String, mode: &ExecMode) -> Re
         .to_string_lossy()
         .to_string();
 
-    let mut run_process = RunProcess::default();
-    run_process.bin = bin_path.display().to_string();
-    run_process.args = std::iter::once(bin_name)
-        .chain(args.iter().map(|s| s.clone()))
-        .collect();
+    let run_process = RunProcess {
+        bin: bin_path.display().to_string(),
+        args: std::iter::once(bin_name)
+            .chain(args.iter().cloned())
+            .collect(),
+        ..Default::default()
+    };
 
     service
         .run_process(run_process)
@@ -342,7 +347,7 @@ fn project_dir() -> Result<PathBuf> {
 }
 
 fn is_broken_pipe(message: &str) -> bool {
-    message.to_lowercase().find("error 32").is_some()
+    message.to_lowercase().contains("error 32")
 }
 
 async fn ui_main<T>(args: Args, exec_mode: ExecMode, mut ui: UI<T>) -> Result<()>
@@ -398,9 +403,15 @@ async fn main() -> Result<()> {
     let mode = ExecMode::new(args.exec_mode, args.exec_shell.clone());
     let mut ui = ui(history, &mode.to_string())?;
 
-    if let Err(err) = ui_main(args, mode, ui.clone()).await {
-        ui_err!(ui, "{}", err);
-        std::process::exit(1);
+    use futures::{future::Either, pin_mut};
+
+    let running = ui_main(args, mode, ui.clone());
+    let cancelled = tokio::signal::ctrl_c();
+    pin_mut!(running);
+    pin_mut!(cancelled);
+
+    if let Either::Left((Err(e), _)) = futures::future::select(running, cancelled).await {
+        ui_err!(ui, "Runtime error: {}", e);
     }
 
     ui_info!(ui, "Shutting down");
