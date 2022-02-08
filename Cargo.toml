@@ -1,6 +1,6 @@
 [package]
 name = "ya-runtime-dbg"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Golem Factory <contact@golem.network>"]
 edition = "2018"
 repository = "https://github.com/golemfactory/ya-runtime-dbg"
@@ -18,7 +18,7 @@ lazy_static = "1.4.0"
 linefeed = "0.6.0"
 shell-words = "1.0.0"
 structopt = "0.3"
-tokio = { version = "0.2", features = ["io-util", "process"], default_features = false }
+tokio = { version = "0.2", features = ["io-util", "process", "signal"], default_features = false }
 tokio-util = { version = "0.2", features = ["codec"] }
 
 [patch.crates-io]
